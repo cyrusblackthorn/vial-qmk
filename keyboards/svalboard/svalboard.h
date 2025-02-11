@@ -33,7 +33,7 @@ struct saved_values {
     bool right_scroll :1;
     bool disable_achordion: 1;
     bool auto_mouse: 1;
-    unsigned int unused0 :5;
+    unsigned int unused0 :4;
     uint8_t left_dpi_index;
     uint8_t right_dpi_index;
     uint8_t mh_timer_index;
