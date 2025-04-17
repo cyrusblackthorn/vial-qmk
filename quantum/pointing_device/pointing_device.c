@@ -82,25 +82,57 @@ static bool           pointing_device_force_send = false;
 #define POINTING_DEVICE_DRIVER_CONCAT(name) name##_pointing_device_driver
 #define POINTING_DEVICE_DRIVER(name) POINTING_DEVICE_DRIVER_CONCAT(name)
 
+
 #ifdef POINTING_DEVICE_DRIVER_custom
-__attribute__((weak)) void           pointing_device_driver_init(void) {}
-__attribute__((weak)) report_mouse_t pointing_device_driver_get_report(report_mouse_t mouse_report) {
+
+static uint16_t custom_cpi = 0;
+
+void custom_device_driver_init(void) {
+}
+
+void custom_device_driver_set_cpi(uint16_t cpi) {
+    custom_cpi = cpi;
+}
+
+uint16_t custom_device_driver_get_cpi(void) {
+    return custom_cpi;
+}
+
+report_mouse_t  custom_device_driver_get_report(report_mouse_t mouse_report) {
     return mouse_report;
 }
-__attribute__((weak)) uint16_t pointing_device_driver_get_cpi(void) {
-    return 0;
-}
-__attribute__((weak)) void pointing_device_driver_set_cpi(uint16_t cpi) {}
-
 const pointing_device_driver_t custom_pointing_device_driver = {
+    .init       = custom_device_driver_init,
+    .get_report = custom_device_driver_get_report,
+    .get_cpi    = custom_device_driver_get_cpi,
+    .set_cpi    = custom_device_driver_set_cpi,
+};
+
+#endif
+
+const pointing_device_driver_t *real_device_driver = &POINTING_DEVICE_DRIVER(POINTING_DEVICE_DRIVER_NAME);
+
+__attribute__((weak)) void           pointing_device_driver_init(void) {
+    real_device_driver->init();
+}
+__attribute__((weak)) report_mouse_t pointing_device_driver_get_report(report_mouse_t mouse_report) {
+    return real_device_driver->get_report(mouse_report);
+}
+__attribute__((weak)) uint16_t pointing_device_driver_get_cpi(void) {
+    return real_device_driver->get_cpi();
+}
+__attribute__((weak)) void pointing_device_driver_set_cpi(uint16_t cpi) {
+    real_device_driver->set_cpi(cpi);
+}
+
+const pointing_device_driver_t __sval_pointing_device_driver = {
     .init       = pointing_device_driver_init,
     .get_report = pointing_device_driver_get_report,
     .get_cpi    = pointing_device_driver_get_cpi,
     .set_cpi    = pointing_device_driver_set_cpi,
 };
-#endif
 
-const pointing_device_driver_t *pointing_device_driver = &POINTING_DEVICE_DRIVER(POINTING_DEVICE_DRIVER_NAME);
+const pointing_device_driver_t *pointing_device_driver = &__sval_pointing_device_driver;
 
 /**
  * @brief Keyboard level code pointing device initialisation
