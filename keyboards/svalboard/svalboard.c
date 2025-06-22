@@ -2,6 +2,7 @@
 #include "eeconfig.h"
 #include "version.h"
 #include "split_common/transactions.h"
+#include QMK_KEYBOARD_H
 
 saved_values_t global_saved_values;
 const int16_t mh_timer_choices[4] = { 300, 500, 800, -1 }; // -1 is infinite.
@@ -12,12 +13,12 @@ bool fresh_install = false;
 #endif
 
 void write_eeprom_kb(void) {
-    eeconfig_update_kb_datablock(&global_saved_values);
+    eeconfig_update_kb_datablock(&global_saved_values, 0, EECONFIG_KB_DATA_SIZE);
 }
 
 void read_eeprom_kb(void) {
     bool modified = false;
-    eeconfig_read_kb_datablock(&global_saved_values);
+    eeconfig_read_kb_datablock(&global_saved_values, 0, EECONFIG_KB_DATA_SIZE);
     if (global_saved_values.version < 1) {
         global_saved_values.version = 1;
         global_saved_values.right_dpi_index=2;
@@ -265,3 +266,17 @@ void bootmagic_lite(void) {
 __attribute__((weak)) void recalibrate_pointer(void) {
 }
 
+
+const char chordial_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
+    LAYOUT(
+            'R', 'R', 'R', 'R', 'R', 'R',
+            'R', 'R', 'R', 'R', 'R', 'R',
+            'R', 'R', 'R', 'R', 'R', 'R',
+            'R', 'R', 'R', 'R', 'R', 'R',
+            'L', 'L', 'L', 'L', 'L', 'L',
+            'L', 'L', 'L', 'L', 'L', 'L',
+            'L', 'L', 'L', 'L', 'L', 'L',
+            'L', 'L', 'L', 'L', 'L', 'L',
+            '*', '*', '*', '*', '*', '*',
+            '*', '*', '*', '*', '*', '*'
+          );

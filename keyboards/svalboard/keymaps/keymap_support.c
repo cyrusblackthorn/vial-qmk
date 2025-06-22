@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdbool.h>
 #include <stdint.h>
 #include "svalboard.h"
-#include "features/achordion.h"
 #include "keymap_support.h"
 #include "axis_scale.h"
 
@@ -41,14 +40,14 @@ void mouse_mode(bool);
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_MH_ENABLE)
 
-#define SCROLL_DIVISOR 20
-
+#define SCROLL_DIVISOR 1
+#define SCROLL_MULTIPLIER 15
 bool mouse_mode_enabled = false;
 
-axis_scale_t l_x = {1, SCROLL_DIVISOR, 0};
-axis_scale_t l_y = {1, SCROLL_DIVISOR, 0};
-axis_scale_t r_x = {1, SCROLL_DIVISOR, 0};
-axis_scale_t r_y = {1, SCROLL_DIVISOR, 0};
+axis_scale_t l_x = {1, SCROLL_DIVISOR, SCROLL_MULTIPLIER};
+axis_scale_t l_y = {1, SCROLL_DIVISOR, SCROLL_MULTIPLIER};
+axis_scale_t r_x = {1, SCROLL_DIVISOR, SCROLL_MULTIPLIER};
+axis_scale_t r_y = {1, SCROLL_DIVISOR, SCROLL_MULTIPLIER};
 
 
 axis_scale_t sniper_x = {1, 1, 0};
@@ -160,7 +159,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 
     // Abort additional processing if userspace code did
     if (!process_record_user(keycode, record)) { return false;}
-    if (!in_mod_tap && !global_saved_values.disable_achordion && !process_achordion(keycode, record)) { return false; }
 
     // We are in a mod tap, with a KC_TRANSPARENT, lets make it transparent...
     if (IS_QK_MOD_TAP(keycode) && ((keycode & 0xFF) == KC_TRANSPARENT) &&
@@ -350,10 +348,6 @@ void ps2_mouse_moved_user(report_mouse_t *mouse_report) {
 #endif
 
 void matrix_scan_kb(void) {
-    if (!global_saved_values.disable_achordion) {
-        achordion_task();
-    }
-
     if ((mh_timer_choices[global_saved_values.mh_timer_index] >= 0) && mouse_mode_enabled && (timer_elapsed(mh_auto_buttons_timer) > mh_timer_choices[global_saved_values.mh_timer_index]) && mouse_keys_pressed == 0) {
         if (!tp_buttons) {
             mouse_mode(false);

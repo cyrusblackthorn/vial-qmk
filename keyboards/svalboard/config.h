@@ -20,6 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // This is used by our user's keymaps for conditionals.
 #define SVALBOARD
 
+#define POINTING_DEVICE_HIRES_SCROLL_ENABLE 1
+#define POINTING_DEVICE_HIRES_SCROLL_MULTIPLIER 120
+#define WHEEL_EXTENDED_REPORT 1
+
 #define AXIS_TYPE int16_t
 
 //#define FORTY_FOUR_MM_TB
