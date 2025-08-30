@@ -41,7 +41,7 @@ void mouse_mode(bool);
 #if defined(POINTING_DEVICE_AUTO_MOUSE_MH_ENABLE)
 
 #define SCROLL_DIVISOR 1
-#define SCROLL_MULTIPLIER 15
+#define SCROLL_MULTIPLIER 5
 bool mouse_mode_enabled = false;
 
 axis_scale_t l_x = {1, SCROLL_DIVISOR, SCROLL_MULTIPLIER};
