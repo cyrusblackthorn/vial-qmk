@@ -146,10 +146,8 @@ void handle_sniper_key(bool pressed, uint8_t divisor) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t reportMouse) {
-    if (!scroll_timer_running) {
-        if (reportMouse.x == 0 && reportMouse.y == 0 && reportMouse.h == 0 && reportMouse.v == 0)
-            return reportMouse;
-    }
+   if (reportMouse.x == 0 && reportMouse.y == 0 && reportMouse.h == 0 && reportMouse.v == 0)
+        return reportMouse;
 
     mouse_mode(true);
 
