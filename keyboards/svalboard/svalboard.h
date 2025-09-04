@@ -31,7 +31,7 @@ struct saved_values {
     uint8_t version;  // Currently at 1,  We assume all new data will be zeroed.
     bool left_scroll :1;
     bool right_scroll :1;
-    bool disable_achordion: 1;
+    bool axis_scroll_lock: 1;
     bool auto_mouse: 1;
     unsigned int unused0 :4;
     uint8_t left_dpi_index;

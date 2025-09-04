@@ -57,6 +57,11 @@ void read_eeprom_kb(void) {
         global_saved_values.auto_mouse = true;
         modified = true;
     }
+    if (global_saved_values.version < 5) {
+        global_saved_values.version = 5;
+        global_saved_values.axis_scroll_lock = false;
+    }
+
     // As we add versions, just append here.
     if (modified) {
         write_eeprom_kb();
@@ -87,8 +92,8 @@ void output_keyboard_info(void) {
 	    yes_or_no(global_saved_values.left_scroll), dpi_choices[global_saved_values.left_dpi_index],
 	    yes_or_no(global_saved_values.right_scroll), dpi_choices[global_saved_values.right_dpi_index]);
     send_string(output_buffer);
-    sprintf(output_buffer, "Achordion: %s, MH Keys: %s, MH Keys Timer: %d\n",
-	    yes_or_no(!global_saved_values.disable_achordion),
+    sprintf(output_buffer, "Axis Scroll Lock: %s, MH Keys: %s, MH Keys Timer: %d\n",
+	    yes_or_no(global_saved_values.axis_scroll_lock),
         yes_or_no(global_saved_values.auto_mouse),
 	    mh_timer_choices[global_saved_values.mh_timer_index]);
     send_string(output_buffer);
@@ -267,7 +272,7 @@ __attribute__((weak)) void recalibrate_pointer(void) {
 }
 
 
-const char chordial_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
+const char chordal_hold_layout[MATRIX_ROWS][MATRIX_COLS] PROGMEM =
     LAYOUT(
             'R', 'R', 'R', 'R', 'R', 'R',
             'R', 'R', 'R', 'R', 'R', 'R',

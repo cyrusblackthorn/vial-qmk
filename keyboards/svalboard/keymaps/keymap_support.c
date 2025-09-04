@@ -40,6 +40,8 @@ void mouse_mode(bool);
 
 #if defined(POINTING_DEVICE_AUTO_MOUSE_MH_ENABLE)
 
+
+#define SCROLL_FREQUENCY_MS 10
 #define SCROLL_DIVISOR 1
 #define SCROLL_MULTIPLIER 5
 bool mouse_mode_enabled = false;
@@ -54,6 +56,12 @@ axis_scale_t sniper_x = {1, 1, 0};
 axis_scale_t sniper_y = {1, 1, 0};
 axis_scale_t sniper_h = {1, 1, 0};
 axis_scale_t sniper_v = {1, 1, 0};
+
+uint16_t scroll_timer = 0;
+int16_t scroll_accumulator_h = 0;
+int16_t scroll_accumulator_v = 0;
+
+bool scroll_timer_running = false;
 
 bool enable_scale_2 = false;
 bool enable_scale_3 = false;
@@ -87,13 +95,34 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
         reportMouse1.x = 0;
         reportMouse1.y = 0;
     }
-
     if ((global_saved_values.right_scroll != scroll_hold) != scroll_toggle) {
         reportMouse2.h = add_to_axis(&r_x, reportMouse2.x);
         reportMouse2.v = add_to_axis(&r_y, -reportMouse2.y);
 
         reportMouse2.x = 0;
         reportMouse2.y = 0;
+    }
+
+    if ((reportMouse1.h != 0 || reportMouse1.v != 0 || reportMouse2.h != 0 || reportMouse2.v != 0) && !scroll_timer_running) {
+        scroll_timer_running = true;
+        scroll_timer = timer_read();
+    }
+
+    if (scroll_timer_running) {
+        scroll_accumulator_h += reportMouse1.h + reportMouse2.h;
+        scroll_accumulator_v += reportMouse1.v + reportMouse2.v;
+        reportMouse1.h = reportMouse2.h = 0;
+        reportMouse1.v = reportMouse2.v = 0;
+    }
+
+    if (scroll_timer_running && timer_elapsed(scroll_timer) > SCROLL_FREQUENCY_MS) {
+        if (!global_saved_values.axis_scroll_lock) {
+            reportMouse1.h = scroll_accumulator_h;
+        }
+        reportMouse1.v = scroll_accumulator_v;
+        scroll_timer_running = false;
+        scroll_accumulator_h = 0;
+        scroll_accumulator_v = 0;
     }
 
     mouse_mode(true);
@@ -117,8 +146,10 @@ void handle_sniper_key(bool pressed, uint8_t divisor) {
 }
 
 report_mouse_t pointing_device_task_user(report_mouse_t reportMouse) {
-    if (reportMouse.x == 0 && reportMouse.y == 0)
-        return reportMouse;
+    if (!scroll_timer_running) {
+        if (reportMouse.x == 0 && reportMouse.y == 0 && reportMouse.h == 0 && reportMouse.v == 0)
+            return reportMouse;
+    }
 
     mouse_mode(true);
 
@@ -136,8 +167,8 @@ void mh_change_timeouts(void) {
     write_eeprom_kb();
 }
 
-void toggle_achordion(void) {
-    global_saved_values.disable_achordion = !global_saved_values.disable_achordion;
+void toggle_axis_scroll_lock(void) {
+    global_saved_values.axis_scroll_lock = !global_saved_values.axis_scroll_lock;
     write_eeprom_kb();
 }
 
@@ -199,7 +230,7 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
 	                    keycode == SV_RIGHT_DPI_DEC || \
 	                    keycode == SV_LEFT_SCROLL_TOGGLE || \
 		            keycode == SV_RIGHT_SCROLL_TOGGLE || \
-		            keycode == SV_TOGGLE_ACHORDION || \
+		            keycode == SV_AXIS_SCROLL_LOCK || \
 	                    keycode == SV_MH_CHANGE_TIMEOUTS || \
                         keycode == SV_TOGGLE_AUTOMOUSE)
 
@@ -260,8 +291,8 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
             case SV_CAPS_WORD:
                 caps_word_toggle();
                 return false;
-            case SV_TOGGLE_ACHORDION:
-                toggle_achordion();
+            case SV_AXIS_SCROLL_LOCK:
+                toggle_axis_scroll_lock();
                 return false;
             case SV_TOGGLE_23_67:
                 layer_on(2);
