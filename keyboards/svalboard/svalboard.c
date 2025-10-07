@@ -65,9 +65,9 @@ void read_eeprom_kb(void) {
     if (global_saved_values.version < 6) {
         global_saved_values.version = 6;
 	
-        global_saved_values.axis_scroll_notch_threshold = 20;
-        global_saved_values.axis_scroll_slow_timer_ms = 250;
-        global_saved_values.axis_scroll_inactivity_reset_ms = 300;
+        global_saved_values.axis_scroll_notch_threshold = 10;
+        global_saved_values.axis_scroll_slow_timer_ms = 100;
+        global_saved_values.axis_scroll_inactivity_reset_ms = 800;
         modified = true;
     }
     
@@ -89,7 +89,7 @@ const char *yes_or_no(int flag) {
     }
 }
 
-const uint16_t dpi_choices[] = { 200, 400, 600, 800, 1200, 1600, 2400 }; // If we need more, add them.
+const uint16_t dpi_choices[] = { 200, 400, 600, 800, 1200, 1600, 2400, 3200, 4800, 6400, 12000 }; // If we need more, add them.
 #define DPI_CHOICES_LENGTH (sizeof(dpi_choices)/sizeof(dpi_choices[0]))
 
 void output_keyboard_info(void) {

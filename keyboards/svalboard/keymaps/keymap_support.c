@@ -82,7 +82,7 @@ static uint32_t axis_scroll_h_accumulator = 0;
 static uint32_t axis_scroll_v_accumulator = 0;
 static bool axis_scroll_in_transition = false;
 
-#define AXIS_SCROLL_CANCEL_RATIO 1.25 // To cancel a switch, the original direction's movement must be 2x stronger than the new direction's
+#define AXIS_SCROLL_CANCEL_RATIO 4
 
 static int16_t movement_to_hundredths_inch(int16_t movement, uint16_t dpi) {
     return ((int32_t)movement * 100) / dpi;
@@ -103,8 +103,8 @@ static void update_axis_scroll_mode(int16_t h_hundredths, int16_t v_hundredths) 
         }
     }
 
-    int16_t abs_h = abs(h_hundredths);
-    int16_t abs_v = abs(v_hundredths);
+    uint16_t abs_h = abs(h_hundredths);
+    uint16_t abs_v = abs(v_hundredths);
 
     if (abs_h != 0 || abs_v != 0) {
         axis_scroll_last_activity_timer = now;
@@ -125,6 +125,10 @@ static void update_axis_scroll_mode(int16_t h_hundredths, int16_t v_hundredths) 
             } else {
                 if (abs_v > (abs_h * AXIS_SCROLL_CANCEL_RATIO)) {
                     axis_scroll_in_transition = false;
+                    axis_scroll_h_accumulator = 0;
+                    axis_scroll_v_accumulator = 0;
+		    scroll_accumulator_h = 0;
+		    scroll_accumulator_v = 0;
                 } else if (timer_elapsed32(axis_scroll_direction_timer) > global_saved_values.axis_scroll_slow_timer_ms) {
                     current_axis_mode = AXIS_SCROLL_HORIZONTAL;
                     axis_scroll_h_accumulator = 0;
@@ -144,6 +148,10 @@ static void update_axis_scroll_mode(int16_t h_hundredths, int16_t v_hundredths) 
             } else {
                 if (abs_h > (abs_v * AXIS_SCROLL_CANCEL_RATIO)) {
                     axis_scroll_in_transition = false;
+                    axis_scroll_h_accumulator = 0;
+                    axis_scroll_v_accumulator = 0;
+		    scroll_accumulator_h = 0;
+		    scroll_accumulator_v = 0;
                 } else if (timer_elapsed32(axis_scroll_direction_timer) > global_saved_values.axis_scroll_slow_timer_ms) {
                     current_axis_mode = AXIS_SCROLL_VERTICAL;
                     axis_scroll_h_accumulator = 0;
