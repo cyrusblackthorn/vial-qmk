@@ -60,6 +60,8 @@ axis_scale_t sniper_v = {1, 1, 0};
 uint16_t scroll_timer = 0;
 int16_t scroll_accumulator_h = 0;
 int16_t scroll_accumulator_v = 0;
+int32_t m_scroll_accumulator_h = 0;
+int32_t m_scroll_accumulator_v = 0;
 
 bool scroll_timer_running = false;
 
@@ -70,100 +72,93 @@ bool enable_scale_5 = false;
 static bool scroll_hold    = false,
             scroll_toggle  = false;
 
-typedef enum {
-    AXIS_SCROLL_VERTICAL = 0,
-    AXIS_SCROLL_HORIZONTAL = 1
-} axis_scroll_mode_t;
 
-static axis_scroll_mode_t current_axis_mode = AXIS_SCROLL_VERTICAL;
-static uint32_t axis_scroll_last_activity_timer = 0;
-static uint32_t axis_scroll_direction_timer = 0;
-static uint32_t axis_scroll_h_accumulator = 0;
-static uint32_t axis_scroll_v_accumulator = 0;
-static bool axis_scroll_in_transition = false;
+#define AXIS_LOCK_BREAKAWAY_THRESHOLD 18750
+#define AXIS_LOCK_ENGAGE_THRESHOLD 6250
+#define AXIS_LOCK_TIMEOUT_MS 500
 
-#define AXIS_SCROLL_CANCEL_RATIO 4
+#define AXIS_DOMINANCE_NUMERATOR 3
+#define AXIS_DOMINANCE_DENOMINATOR 2
 
-static int16_t movement_to_hundredths_inch(int16_t movement, uint16_t dpi) {
-    return ((int32_t)movement * 100) / dpi;
-}
-static void update_axis_scroll_mode(int16_t h_hundredths, int16_t v_hundredths) {
-    if (!global_saved_values.axis_scroll_lock) {
+
+static enum scroll_mode {
+    SV_AXIS_FREE,
+    SV_AXIS_LOCKED_V,
+    SV_AXIS_LOCKED_H
+} axis_scroll_mode = SV_AXIS_FREE;
+static int32_t axis_lock_accum_h = 0;
+static int32_t axis_lock_accum_v = 0;
+static uint16_t axis_lock_timer = 0;
+
+
+void update_axis_scroll_mode(int32_t h, int32_t v) {
+    if (h != 0 || v != 0) {
+        axis_lock_timer = timer_read();
+    } else {
+        if (timer_elapsed(axis_lock_timer) > AXIS_LOCK_TIMEOUT_MS) {
+            if (axis_scroll_mode != SV_AXIS_FREE) {
+                axis_scroll_mode = SV_AXIS_FREE;
+                axis_lock_accum_h = 0;
+                axis_lock_accum_v = 0;
+		scroll_accumulator_h = 0;
+                scroll_accumulator_v = 0;
+		m_scroll_accumulator_h = 0;
+		m_scroll_accumulator_v = 0;
+            }
+        }
         return;
     }
 
-    uint32_t now = timer_read32();
+    switch (axis_scroll_mode) {
+        case SV_AXIS_FREE:
+            axis_lock_accum_h += h;
+            axis_lock_accum_v += v;
 
-    if (timer_elapsed32(axis_scroll_last_activity_timer) > global_saved_values.axis_scroll_inactivity_reset_ms) {
-        if (current_axis_mode != AXIS_SCROLL_VERTICAL) {
-            current_axis_mode = AXIS_SCROLL_VERTICAL;
-            axis_scroll_h_accumulator = 0;
-            axis_scroll_v_accumulator = 0;
-            axis_scroll_in_transition = false;
-        }
-    }
-
-    uint16_t abs_h = abs(h_hundredths);
-    uint16_t abs_v = abs(v_hundredths);
-
-    if (abs_h != 0 || abs_v != 0) {
-        axis_scroll_last_activity_timer = now;
-
-        if (current_axis_mode == AXIS_SCROLL_VERTICAL) {
-            axis_scroll_h_accumulator += abs_h;
-        } else {
-            axis_scroll_v_accumulator += abs_v;
-        }
-
-        if (current_axis_mode == AXIS_SCROLL_VERTICAL) {
-            if (!axis_scroll_in_transition) {
-                if (axis_scroll_h_accumulator > global_saved_values.axis_scroll_notch_threshold ||
-		    abs_v > (abs_h * AXIS_SCROLL_CANCEL_RATIO)) {
-                    axis_scroll_in_transition = true;
-                    axis_scroll_direction_timer = now;
-                }
-            } else {
-                if (abs_v > (abs_h * AXIS_SCROLL_CANCEL_RATIO)) {
-                    axis_scroll_in_transition = false;
-                    axis_scroll_h_accumulator = 0;
-                    axis_scroll_v_accumulator = 0;
-		    scroll_accumulator_h = 0;
-		    scroll_accumulator_v = 0;
-                } else if (timer_elapsed32(axis_scroll_direction_timer) > global_saved_values.axis_scroll_slow_timer_ms) {
-                    current_axis_mode = AXIS_SCROLL_HORIZONTAL;
-                    axis_scroll_h_accumulator = 0;
-                    axis_scroll_v_accumulator = 0;
-		    scroll_accumulator_h = 0;
-		    scroll_accumulator_v = 0;
-                    axis_scroll_in_transition = false;
-                }
+            if (abs(axis_lock_accum_v) * AXIS_DOMINANCE_NUMERATOR >= abs(axis_lock_accum_h) * AXIS_DOMINANCE_DENOMINATOR) {
+	        axis_scroll_mode = SV_AXIS_LOCKED_V;
+                axis_lock_accum_h = 0;
+            } else if (abs(axis_lock_accum_h) >= AXIS_LOCK_ENGAGE_THRESHOLD) {
+                axis_scroll_mode = SV_AXIS_LOCKED_H;
+                axis_lock_accum_v = 0;
             }
-        } else {
-            if (!axis_scroll_in_transition) {
-                if (axis_scroll_v_accumulator > global_saved_values.axis_scroll_notch_threshold ||
-		    abs_h > (abs_v * AXIS_SCROLL_CANCEL_RATIO)) {
-                    axis_scroll_in_transition = true;
-                    axis_scroll_direction_timer = now;
-                }
-            } else {
-                if (abs_h > (abs_v * AXIS_SCROLL_CANCEL_RATIO)) {
-                    axis_scroll_in_transition = false;
-                    axis_scroll_h_accumulator = 0;
-                    axis_scroll_v_accumulator = 0;
-		    scroll_accumulator_h = 0;
-		    scroll_accumulator_v = 0;
-                } else if (timer_elapsed32(axis_scroll_direction_timer) > global_saved_values.axis_scroll_slow_timer_ms) {
-                    current_axis_mode = AXIS_SCROLL_VERTICAL;
-                    axis_scroll_h_accumulator = 0;
-                    axis_scroll_v_accumulator = 0;
-		    scroll_accumulator_h = 0;
-		    scroll_accumulator_v = 0;
-                    axis_scroll_in_transition = false;
-                }
+            break;
+
+        case SV_AXIS_LOCKED_V:
+            if ((int32_t)abs(v) * AXIS_DOMINANCE_NUMERATOR >= (int32_t)abs(h) * AXIS_DOMINANCE_DENOMINATOR) {
+                axis_lock_accum_h = 0;
             }
-        }
+
+	    axis_lock_accum_h += h;
+
+            if (abs(axis_lock_accum_h) >= AXIS_LOCK_BREAKAWAY_THRESHOLD) {
+	        axis_scroll_mode     = SV_AXIS_LOCKED_H;
+                axis_lock_accum_v    = 0;
+                scroll_accumulator_h = 0;
+                scroll_accumulator_v = 0;
+		m_scroll_accumulator_h = 0;
+		m_scroll_accumulator_v = 0;
+            }
+        break;
+
+        case SV_AXIS_LOCKED_H:
+            if ((int32_t)abs(h) * AXIS_DOMINANCE_NUMERATOR >= (int32_t)abs(v) * AXIS_DOMINANCE_DENOMINATOR) {
+                axis_lock_accum_v = 0;
+            }
+
+            axis_lock_accum_v += v;
+
+            if (abs(axis_lock_accum_v) >= AXIS_LOCK_BREAKAWAY_THRESHOLD) {
+                axis_scroll_mode     = SV_AXIS_LOCKED_V;
+                axis_lock_accum_h    = 0;
+                scroll_accumulator_h = 0;
+                scroll_accumulator_v = 0;
+		m_scroll_accumulator_h = 0;
+		m_scroll_accumulator_v = 0;
+            }
+            break;
     }
 }
+
 void handle_sniper_key(bool pressed, uint8_t divisor) {
     if (!pressed) {
         div_div_axis(&sniper_x, divisor);
@@ -177,6 +172,7 @@ void handle_sniper_key(bool pressed, uint8_t divisor) {
         mult_div_axis(&sniper_v, divisor);
     }
 }
+
 report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, report_mouse_t reportMouse2) {
     report_mouse_t ret_mouse;
 
@@ -195,23 +191,16 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
     if (reportMouse1.x == 0 && reportMouse1.y == 0 && reportMouse2.x == 0 && reportMouse2.y == 0)
         return pointing_device_combine_reports(reportMouse1, reportMouse2);
 
-    // Temporary variables to hold the final scroll values in "counts"
-    int16_t h1_counts = 0, v1_counts = 0;
-    int16_t h2_counts = 0, v2_counts = 0;
-
     if ((global_saved_values.left_scroll != scroll_hold) != scroll_toggle) {
-        h1_counts = reportMouse1.x;
         reportMouse1.h = add_to_axis(&l_x, reportMouse1.x);
-        v1_counts = reportMouse1.y;
         reportMouse1.v = add_to_axis(&l_y, -reportMouse1.y);
 
+	
         reportMouse1.x = 0;
         reportMouse1.y = 0;
     }
     if ((global_saved_values.right_scroll != scroll_hold) != scroll_toggle) {
-        h2_counts = reportMouse2.x;
         reportMouse2.h = add_to_axis(&r_x, reportMouse2.x);
-        v2_counts = reportMouse2.y;
         reportMouse2.v = add_to_axis(&r_y, -reportMouse2.y);
 
         reportMouse2.x = 0;
@@ -224,32 +213,24 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
     }
 
     if (scroll_timer_running) {
-        int16_t h1_hundredths = movement_to_hundredths_inch(h1_counts, get_left_dpi());
-        int16_t v1_hundredths = movement_to_hundredths_inch(v1_counts, get_left_dpi());
-        int16_t h2_hundredths = movement_to_hundredths_inch(h2_counts, get_right_dpi());
-        int16_t v2_hundredths = movement_to_hundredths_inch(v2_counts, get_right_dpi());
+        m_scroll_accumulator_h += ((int32_t)reportMouse1.h * 100000) / get_left_dpi();
+	m_scroll_accumulator_v += ((int32_t)reportMouse1.v * 100000) / get_left_dpi();
+	m_scroll_accumulator_h += ((int32_t)reportMouse2.h * 100000) / get_right_dpi();
+	m_scroll_accumulator_v += ((int32_t)reportMouse2.v * 100000) / get_right_dpi();
 
-        int16_t total_h_hundredths = h1_hundredths + h2_hundredths;
-        int16_t total_v_hundredths = v1_hundredths + v2_hundredths;
-
-        update_axis_scroll_mode(total_h_hundredths, total_v_hundredths);
-
-        if (!axis_scroll_in_transition) {
-            int16_t total_h_counts = reportMouse1.h + reportMouse2.h;
-            int16_t total_v_counts = reportMouse1.v + reportMouse2.v;
-            scroll_accumulator_h += total_h_counts;
-            scroll_accumulator_v += total_v_counts;
-        }
+        scroll_accumulator_h += reportMouse1.h + reportMouse2.h;
+        scroll_accumulator_v += reportMouse1.v + reportMouse2.v;
         reportMouse1.h = reportMouse2.h = 0;
         reportMouse1.v = reportMouse2.v = 0;
     }
 
     if (scroll_timer_running && timer_elapsed(scroll_timer) > SCROLL_FREQUENCY_MS) {
         if (global_saved_values.axis_scroll_lock) {
-            if (current_axis_mode == AXIS_SCROLL_VERTICAL) {
+	    update_axis_scroll_mode(m_scroll_accumulator_h, m_scroll_accumulator_v);
+            if (axis_scroll_mode == SV_AXIS_LOCKED_V) {
                 reportMouse1.v = scroll_accumulator_v;
                 reportMouse1.h = 0;
-            } else { // AXIS_SCROLL_HORIZONTAL
+            } else {
                 reportMouse1.h = scroll_accumulator_h;
                 reportMouse1.v = 0;
             }
@@ -261,6 +242,8 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
         scroll_timer_running = false;
         scroll_accumulator_h = 0;
         scroll_accumulator_v = 0;
+	m_scroll_accumulator_h = 0;
+	m_scroll_accumulator_v = 0;
     }
 
     mouse_mode(true);
@@ -269,45 +252,8 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
     return pointing_device_task_user(ret_mouse);
 }
 
-// Enhanced axis scroll lock system settings
-void adjust_axis_scroll_notch_threshold(bool increase) {
-    if (increase && global_saved_values.axis_scroll_notch_threshold < 255) {
-        global_saved_values.axis_scroll_notch_threshold += 10; // Adjust by 0.1 inch
-    } else if (!increase && global_saved_values.axis_scroll_notch_threshold > 10) {
-        global_saved_values.axis_scroll_notch_threshold -= 10;
-    }
-    uprintf("Axis scroll notch threshold: %d hundredths of inch\n", global_saved_values.axis_scroll_notch_threshold);
-    write_eeprom_kb();
-}
-
-void adjust_axis_scroll_timer(bool increase) {
-    if (increase && global_saved_values.axis_scroll_slow_timer_ms < 5000) {
-        global_saved_values.axis_scroll_slow_timer_ms += 50;
-    } else if (!increase && global_saved_values.axis_scroll_slow_timer_ms > 50) {
-        global_saved_values.axis_scroll_slow_timer_ms -= 50;
-    }
-    uprintf("Axis scroll slow timer: %d ms\n", global_saved_values.axis_scroll_slow_timer_ms);
-    write_eeprom_kb();
-}
-
-void adjust_axis_scroll_inactivity_reset(bool increase) {
-    if (increase && global_saved_values.axis_scroll_inactivity_reset_ms < 5000) {
-        global_saved_values.axis_scroll_inactivity_reset_ms += 100;
-    } else if (!increase && global_saved_values.axis_scroll_inactivity_reset_ms > 100) {
-        global_saved_values.axis_scroll_inactivity_reset_ms -= 100;
-    }
-    uprintf("Axis scroll inactivity timer: %d ms\n", global_saved_values.axis_scroll_inactivity_reset_ms);
-    write_eeprom_kb();
-}
-
 void toggle_axis_scroll_lock(void) {
     global_saved_values.axis_scroll_lock = !global_saved_values.axis_scroll_lock;
-    // Reset axis scroll state when toggling
-    current_axis_mode = AXIS_SCROLL_VERTICAL;
-    axis_scroll_h_accumulator = 0;
-    axis_scroll_v_accumulator = 0;
-    axis_scroll_in_transition = false;
-    axis_scroll_last_activity_timer = timer_read32();
     write_eeprom_kb();
 }
 
@@ -452,24 +398,6 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 return false;
             case SV_AXIS_SCROLL_LOCK:
                 toggle_axis_scroll_lock();
-                return false;
-            case SV_AXIS_SCROLL_NOTCH_INC:
-                adjust_axis_scroll_notch_threshold(true);
-                return false;
-            case SV_AXIS_SCROLL_NOTCH_DEC:
-                adjust_axis_scroll_notch_threshold(false);
-                return false;
-            case SV_AXIS_SCROLL_TIMER_INC:
-                adjust_axis_scroll_timer(true);
-                return false;
-            case SV_AXIS_SCROLL_TIMER_DEC:
-                adjust_axis_scroll_timer(false);
-                return false;
-            case SV_AXIS_SCROLL_INACTIVE_INC:
-                adjust_axis_scroll_inactivity_reset(true);
-                return false;
-            case SV_AXIS_SCROLL_INACTIVE_DEC:
-                adjust_axis_scroll_inactivity_reset(false);
                 return false;
             case SV_TOGGLE_23_67:
                 layer_on(2);

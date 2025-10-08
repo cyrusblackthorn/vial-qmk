@@ -28,6 +28,7 @@ void read_eeprom_kb(void) {
     if (global_saved_values.version < 2) {
         global_saved_values.version = 2;
         global_saved_values.mh_timer_index = 3;
+	global_saved_values.left_scroll = true;
         modified = true;
     }
     if (global_saved_values.version < 3) {
@@ -59,15 +60,7 @@ void read_eeprom_kb(void) {
     }
     if (global_saved_values.version < 5) {
         global_saved_values.version = 5;
-        global_saved_values.axis_scroll_lock = false;
-        modified = true;
-    }
-    if (global_saved_values.version < 6) {
-        global_saved_values.version = 6;
-	
-        global_saved_values.axis_scroll_notch_threshold = 10;
-        global_saved_values.axis_scroll_slow_timer_ms = 100;
-        global_saved_values.axis_scroll_inactivity_reset_ms = 800;
+        global_saved_values.axis_scroll_lock = true;
         modified = true;
     }
     
@@ -106,13 +99,6 @@ void output_keyboard_info(void) {
         yes_or_no(global_saved_values.auto_mouse),
 	    mh_timer_choices[global_saved_values.mh_timer_index]);
     send_string(output_buffer);
-    if (global_saved_values.axis_scroll_lock) {
-        sprintf(output_buffer, "Axis Scroll Notch: %d/100in, Slow Timer: %dms, Reset Timer: %dms\n",
-            global_saved_values.axis_scroll_notch_threshold,
-            global_saved_values.axis_scroll_slow_timer_ms,
-            global_saved_values.axis_scroll_inactivity_reset_ms);
-        send_string(output_buffer);
-    }
 }
 
 void increase_left_dpi(void) {

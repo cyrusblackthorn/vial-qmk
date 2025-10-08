@@ -38,9 +38,6 @@ struct saved_values {
     uint8_t right_dpi_index;
     uint8_t mh_timer_index;
     struct layer_hsv layer_colors[DYNAMIC_KEYMAP_LAYER_COUNT];
-    uint8_t axis_scroll_notch_threshold;  // Notch threshold in hundredths of inch
-    uint16_t axis_scroll_slow_timer_ms;   // Timer threshold for slow movement transitions
-    uint16_t axis_scroll_inactivity_reset_ms; // Inactivity timer to reset to V mode
 };
 
 #define SVAL_PROTO_VERSION 3
