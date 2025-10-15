@@ -105,3 +105,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MOUSEKEY_WHEEL_DELTA 120
 
 #define OS_DETECTION_KEYBOARD_RESET
+
+#define PMW33XX_LIFTOFF_DISTANCE 0x00
