@@ -219,7 +219,7 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
 
     if ((global_saved_values.left_scroll != scroll_hold) != scroll_toggle) {
         reportMouse1.h = add_to_axis(&l_x, reportMouse1.x);
-        reportMouse1.v = add_to_axis(&l_y, -reportMouse1.y);
+        reportMouse1.v = add_to_axis(&l_y, reportMouse1.y); //don't invert!
 
 	
         reportMouse1.x = 0;
@@ -227,7 +227,7 @@ report_mouse_t pointing_device_task_combined_user(report_mouse_t reportMouse1, r
     }
     if ((global_saved_values.right_scroll != scroll_hold) != scroll_toggle) {
         reportMouse2.h = add_to_axis(&r_x, reportMouse2.x);
-        reportMouse2.v = add_to_axis(&r_y, -reportMouse2.y);
+        reportMouse2.v = add_to_axis(&r_y, reportMouse2.y); //don't invert!
 
         reportMouse2.x = 0;
         reportMouse2.y = 0;
